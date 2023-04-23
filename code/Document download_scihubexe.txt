@@ -1,0 +1,178 @@
+import sys
+from PyQt5.QtWidgets import (QApplication,QWidget,QLabel,QLineEdit,QMessageBox,QPushButton)
+from PyQt5.QtCore import QCoreApplication
+
+import requests
+import re
+import os
+import urllib.request
+import xlrd
+import pandas as pd
+
+
+# headers 保持与服务器的会话连接
+headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.108 Safari/537.36',
+}
+
+'''
+根据doi，找到文献的pdf，然后下载到本地
+'''
+def getmulPaperPdf():
+    road=doi_num_Edit.text()
+    #road='D:\python爬虫\exc.xlsx'
+    xl = xlrd.open_workbook(road)
+    table = xl.sheets()[0]
+    col = table.col_values(0)
+    #print(col)
+    len_col=len(col)
+    #print(len_col)
+    #print(col[1])
+    index=0
+    failload=[]
+    for i in col:
+        index=index+1
+        sci_Hub_Url = "https://sci-hub.ren/"
+        doi = i;
+        url = sci_Hub_Url + doi
+        pattern = '/.*?\.pdf'
+        path = road_Edit.text()
+        if path:
+            pass
+        else:
+            path = r"papers"
+            if os.path.exists(path):
+                pass
+            else:
+                os.makedirs(path)
+        try:
+            content = requests.get(url, headers=headers)
+            download_url = re.findall(pattern, content.text)
+            download_url[1] = "https:" + download_url[1]
+            req = urllib.request.Request(download_url[1], headers=headers)
+            u = urllib.request.urlopen(req, timeout=5)
+            file_name = download_url[1].split('/')[-2] + '%' + download_url[1].split('/')[-1]
+            f = open(path + '/' + file_name, 'wb')
+            block_sz = 8192
+            while True:
+                buffer = u.read(block_sz)
+                if not buffer:
+                    break
+                f.write(buffer)
+            f.close()
+            print("Sucessful to download" + " " + file_name)
+        except Exception:
+            failload = failload + [doi]
+            print('第' + str(index) + '篇文献' + "下载失败")
+    if failload:
+        print('共有' + str(len(failload)) + '篇文献下载失败')
+        fail = pd.DataFrame(failload)
+        print('未下载成功的文献DOI号已保存在  '+path+ '/未下载成功.xlsx')
+        fail.to_excel(path + '/未下载成功.xlsx',header = False,index=False)
+        print('下载成功的文献保存在' + path)
+    else:
+        print('表格中的'+str(len(col))+'篇文献全部下载成功！！！')
+        print('文献保存在'+path)
+
+def getPaperPdf():
+    sci_Hub_Url = "https://sci-hub.ren/"
+    doi=doi_Edit.text();
+    url = sci_Hub_Url + doi
+    pattern = '/.*?\.pdf'
+    content = requests.get(url, headers=headers)
+    download_url = re.findall(pattern, content.text)
+    # print(download_url)
+    download_url[1] = "https:" + download_url[1]
+    print(download_url[1])
+    path=road_Edit.text()
+    if path:
+        pass
+    else:
+        path = r"papers"
+        if os.path.exists(path):
+            pass
+        else:
+            os.makedirs(path)
+
+    # 使用 urllib.request 来包装请求
+    req = urllib.request.Request(download_url[1], headers=headers)
+    # 使用 urllib.request 模块中的 urlopen方法获取页面
+    u = urllib.request.urlopen(req, timeout=5)
+
+    file_name = download_url[1].split('/')[-2] + '%' + download_url[1].split('/')[-1]
+    f = open(path + '/' + file_name, 'wb')
+
+    block_sz = 8192
+    try:
+        while True:
+            buffer = u.read(block_sz)
+            if not buffer:
+                break
+            f.write(buffer)
+        f.close()
+        print("Sucessful to download" + " " + file_name)
+    except Exception:
+        print("Failed to get pdf")
+
+
+if __name__ == '__main__':
+
+    app = QApplication(sys.argv)  # 创建应用对象
+    Loginwindow = QWidget()  # 构造登录窗口
+    Loginwindow.setWindowTitle("简易scihub下载程序")  # 窗口标题
+    Loginwindow.resize(500, 250)  # 窗口大小
+
+    # 窗口备注
+    window_Label = QLabel(Loginwindow)  # 放置在登录窗口上
+    window_Label.setText("文献下载来源：scihub")  # 设置显示文本
+    window_Label.move(60, 25)
+
+    # 文献DOI的Label
+    doi_Label = QLabel(Loginwindow)  # 放置在登录窗口上
+    doi_Label.setText("请输入文献DOI号：")  # 设置显示文本
+    doi_Label.move(40, 70)
+
+    # 输入文献DOI文本框
+    doi_Edit = QLineEdit(Loginwindow)  # 放置在登录窗口
+    doi_Edit.setFixedWidth(200)
+    doi_Edit.move(140, 65)
+
+    # 搜索按钮
+    doi_search_btn = QPushButton('单个下载', Loginwindow)
+    # music_url,music_title,music_author
+    doi_search_btn.clicked.connect(getPaperPdf)  # 绑定搜索歌曲函数
+    doi_search_btn.move(350, 66)
+
+    # excel表格批量下载
+    doi_num_Label = QLabel(Loginwindow)  # 放置在登录窗口上
+    doi_num_Label.setText("DOI表格路径：")  # 设置显示文本
+    doi_num_Label.move(60, 110)
+
+    # 输入表格路径文本框
+    doi_num_Edit = QLineEdit(Loginwindow)  # 放置在登录窗口
+    doi_num_Edit.setFixedWidth(200)
+    doi_num_Edit.move(140, 110)
+
+    # 批量下载
+    doi_num_btn = QPushButton('批量下载', Loginwindow)
+    doi_num_btn.clicked.connect(getmulPaperPdf)  # 绑定批量下载函数
+    doi_num_btn.move(350, 110)
+
+    # 文献保存路径的Label
+    road_Label = QLabel(Loginwindow)  # 放置在登录窗口上
+    road_Label.setText("请输入文献保存路径：")  # 设置显示文本
+    road_Label.move(20, 145)
+
+    # 输入文献保存路径的文本框
+    road_Edit = QLineEdit(Loginwindow)  # 放置在登录窗口
+    road_Edit.setFixedWidth(200)
+    road_Edit.move(140, 145)
+
+    # 退出按钮
+    exit_bin = QPushButton('退出', Loginwindow)
+    exit_bin.clicked.connect(QCoreApplication.instance().quit)  # 绑定退出时间
+    exit_bin.move(180, 180)
+
+
+    Loginwindow.show()
+    sys.exit(app.exec())
